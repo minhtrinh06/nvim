@@ -30,6 +30,12 @@ later(function()
   vim.keymap.set('n', '<C-l>', nvim_tmux_nav.NvimTmuxNavigateRight)
 end)
 
+-- Milli nvim dashboard ascii gif
+Config.now(function()
+  add({ 'https://github.com/Amansingh-afk/milli.nvim' })
+  require("milli").starter({ splash = "shader", loop = true })
+end)
+
 
 -- Tree-sitter ================================================================
 
@@ -207,10 +213,34 @@ later(function() add({ 'https://github.com/rafamadriz/friendly-snippets' }) end)
 -- If you need them to work elsewhere, consider using other package managers.
 --
 -- You can use it like so:
--- now_if_args(function()
---   add({ 'https://github.com/mason-org/mason.nvim' })
---   require('mason').setup()
--- end)
+
+Config.now(function()
+  add({ 'https://github.com/mason-org/mason.nvim' })
+  require('mason').setup({
+    ui = {
+      icons = {
+        package_installed = "✓",
+        package_pending = "➜",
+        package_uninstalled = "✗"
+      }
+    }
+  })
+end)
+
+Config.now(function()
+  add({ 'https://github.com/mason-org/mason-lspconfig.nvim'})
+  require('mason-lspconfig').setup({
+    -- List language servers you want automatically downloaded
+    ensure_installed = {
+      "lua_ls",    -- Lua
+      "pyright",   -- Python
+      "ts_ls"      -- TypeScript/JavaScript
+    },
+
+    -- Automatically enable servers via Neovim 0.11/0.12+ native vim.lsp.enable()
+    automatic_enable = true,
+  })
+end)
 
 -- Beautiful, usable, well maintained color schemes outside of 'mini.nvim' and
 -- have full support of its highlight groups. Use if you don't like 'miniwinter'

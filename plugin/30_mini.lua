@@ -111,7 +111,15 @@ now(function() require('mini.sessions').setup() end)
 -- See also:
 -- - `:h MiniStarter-example-config` - non-default config examples
 -- - `:h MiniStarter-lifecycle` - how to work with Starter buffer
-now(function() require('mini.starter').setup() end)
+now(function()
+  -- Seed the header with milli.nvim's first splash frame. milli paints its
+  -- animation *over* existing buffer text (see 'plugin/40_plugins.lua'); without
+  -- frame 0 in the header it can't find an anchor and silently shows nothing.
+  -- The splash name must match the one in `require('milli').starter(...)` there.
+  require('mini.starter').setup({
+    header = function() return table.concat(require('milli').load({ splash = 'shader' }).frames[1], '\n') end,
+  })
+end)
 
 -- Statusline. Sets `:h 'statusline'` to show more info in a line below window.
 -- Example usage:
@@ -322,7 +330,7 @@ later(function() require('mini.align').setup() end)
 -- It is not enabled by default because its effects are a matter of taste.
 -- Also scroll and resize have some unwanted side effects (see `:h mini.animate`).
 -- Uncomment next line (use `gcc`) to enable.
--- later(function() require('mini.animate').setup() end)
+later(function() require('mini.animate').setup() end)
 
 -- Go forward/backward with square brackets. Implements consistent sets of mappings
 -- for selected targets (like buffers, diagnostic, quickfix list entries, etc.).
