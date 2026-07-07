@@ -36,6 +36,11 @@ Config.now(function()
   require("milli").starter({ splash = "shader", loop = true })
 end)
 
+-- Helm filetype detection. Neovim has no built-in 'helm' filetype, and the
+-- 'helm_ls' language server only attaches to it, so this plugin is what makes
+-- the Helm setup actually work (it also sets 'yaml.helm-values' for values files).
+later(function() add({ 'https://github.com/towolf/vim-helm' }) end)
+
 
 -- Tree-sitter ================================================================
 
@@ -116,6 +121,21 @@ now_if_args(function()
     'json',
     'jsx',
     'latex',
+    -- Added for requested languages / servers below
+    'markdown_inline', -- inline markup inside markdown
+    'javascript',      -- Next.js / eslint / deno
+    'typescript',      -- Next.js / eslint / deno
+    'tsx',             -- Next.js (React) components
+    'graphql',
+    'dockerfile',      -- docker
+    'dot',             -- graphviz / dot language server
+    'hcl',             -- terraform (.tf / .hcl)
+    'cmake',
+    'jq',
+    -- NOTE: css, html, yaml, json, prisma, proto, rust, odin, java, jinja,
+    -- terraform and latex parsers are already listed above and cover the
+    -- rest of the requested languages. Django/Helm/htmx/tailwind have no
+    -- dedicated parser and reuse html/yaml highlighting + their LSP.
   }
   local isnt_installed = function(lang)
     return #vim.api.nvim_get_runtime_file('parser/' .. lang .. '.*', false) == 0
@@ -186,10 +206,98 @@ later(function()
       -- Allow formatting from LSP server if no dedicated formatter is available
       lsp_format = 'fallback',
     },
-    -- Map of filetype to formatters
-    -- Make sure that necessary CLI tool is available
-    -- formatters_by_ft = { lua = { 'stylua' } },
+    -- Map of filetype -> formatters. The listed CLI tools are installed via
+    -- Mason below (see "Mason tools"). `stop_after_first` picks the first tool
+    -- that is available (e.g. prettierd if running, else prettier).
+    -- Filetypes without an entry fall back to LSP formatting (see above), which
+    -- covers odin (ols), terraform (terraformls), latex (texlab), prisma,
+    -- proto (protols) and cmake (neocmakelsp).
+    formatters_by_ft = {
+      lua = { 'stylua' },
+      sh = { 'shfmt' },
+      bash = { 'shfmt' },
+      rust = { 'rustfmt', lsp_format = 'fallback' },
+      jq = { 'jq' },
+      -- prettier family (installed via npm through Mason)
+      css = { 'prettierd', 'prettier', stop_after_first = true },
+      scss = { 'prettierd', 'prettier', stop_after_first = true },
+      less = { 'prettierd', 'prettier', stop_after_first = true },
+      html = { 'prettierd', 'prettier', stop_after_first = true },
+      json = { 'prettierd', 'prettier', stop_after_first = true },
+      jsonc = { 'prettierd', 'prettier', stop_after_first = true },
+      yaml = { 'prettierd', 'prettier', stop_after_first = true },
+      markdown = { 'prettierd', 'prettier', stop_after_first = true },
+      graphql = { 'prettierd', 'prettier', stop_after_first = true },
+      javascript = { 'prettierd', 'prettier', stop_after_first = true },
+      javascriptreact = { 'prettierd', 'prettier', stop_after_first = true },
+      typescript = { 'prettierd', 'prettier', stop_after_first = true },
+      typescriptreact = { 'prettierd', 'prettier', stop_after_first = true },
+    },
+    -- Format on save. Falls back to LSP formatting; remove this block if you
+    -- prefer to format manually (e.g. bind `require('conform').format`).
+    format_on_save = { timeout_ms = 1000, lsp_format = 'fallback' },
   })
+end)
+
+-- Linting ====================================================================
+
+-- Linters are standalone programs (not LSP servers) that report diagnostics.
+-- Many languages here are already linted by their language server (e.g. the
+-- 'eslint' server lints JS/TS, 'yamlls' validates YAML against schemas), so
+-- 'nvim-lint' only fills the gaps with dedicated CLI linters.
+--
+-- The linter CLIs are installed via Mason (see "Mason tools" below). All the
+-- ones chosen here ship as prebuilt binaries or npm packages, so they need no
+-- Go/Python toolchain.
+later(function()
+  add({ 'https://github.com/mfussenegger/nvim-lint' })
+
+  require('lint').linters_by_ft = {
+    dockerfile = { 'hadolint' },
+    sh = { 'shellcheck' },
+    bash = { 'shellcheck' },
+    markdown = { 'markdownlint' },
+    terraform = { 'tflint' },
+    -- NOTE: GitHub Actions and ESLint are handled by their language servers
+    -- ('gh_actions_ls' and 'eslint'), so no extra linter is wired for them.
+  }
+
+  -- Trigger linting on common events. `try_lint` is a no-op for filetypes
+  -- without a configured linter, so this is safe to run everywhere.
+  local lint_events = { 'BufWritePost', 'BufReadPost', 'InsertLeave' }
+  Config.new_autocmd(lint_events, '*', function()
+    -- Only lint if the linter executable is actually installed
+    require('lint').try_lint()
+  end, 'Run nvim-lint')
+end)
+
+-- Mason tools ================================================================
+
+-- 'mason-lspconfig' (below) only installs *language servers*. Formatters and
+-- linters are separate CLI tools, so ensure they are installed here directly
+-- through Mason's registry API (no extra plugin needed). Names are Mason
+-- package names (see `:Mason` for the full list).
+later(function()
+  local tools = {
+    'stylua',       -- Lua formatter
+    'shfmt',        -- shell formatter
+    'prettier',     -- css/html/json/yaml/markdown/graphql/js/ts formatter
+    'prettierd',    -- faster prettier daemon (preferred when running)
+    'hadolint',     -- Dockerfile linter
+    'shellcheck',   -- shell linter
+    'markdownlint', -- Markdown linter
+    'tflint',       -- Terraform linter
+  }
+
+  local registry = require('mason-registry')
+  local install = function()
+    for _, name in ipairs(tools) do
+      local ok, pkg = pcall(registry.get_package, name)
+      if ok and not pkg:is_installed() then pkg:install() end
+    end
+  end
+  -- Registry may need refreshing on first run before packages are resolvable
+  if registry.refresh then registry.refresh(install) else install() end
 end)
 
 -- Snippets ===================================================================
@@ -230,11 +338,55 @@ end)
 Config.now(function()
   add({ 'https://github.com/mason-org/mason-lspconfig.nvim'})
   require('mason-lspconfig').setup({
-    -- List language servers you want automatically downloaded
+    -- Language servers Mason downloads automatically. Names are the
+    -- 'nvim-lspconfig' server names (see `:h lspconfig-all`). With
+    -- `automatic_enable = true` below, each installed server is enabled via
+    -- the native `vim.lsp.enable()` and picks up any 'after/lsp/<name>.lua'.
     ensure_installed = {
-      "lua_ls",    -- Lua
-      "pyright",   -- Python
-      "ts_ls"      -- TypeScript/JavaScript
+      -- Existing
+      "lua_ls",       -- Lua
+      "pyright",      -- Python
+
+      -- Web / frontend
+      "cssls",        -- CSS
+      "html",         -- HTML
+      "ts_ls",        -- TypeScript / JavaScript / Next.js (React)
+      "eslint",       -- ESLint (vscode-eslint-language-server)
+      "tailwindcss",  -- Tailwind CSS
+      "htmx",         -- htmx
+      "graphql",      -- GraphQL
+      "denols",       -- Deno (activates only in deno.json projects)
+      "emmet_language_server", -- handy for html/jsx (optional, remove if unwanted)
+
+      -- Templating
+      "djlsp",        -- Django templates
+      "jinja_lsp",    -- Jinja
+
+      -- Systems / general languages
+      "ols",          -- Odin
+      "rust_analyzer",-- Rust
+      "jdtls",        -- Java (needs a JDK 17+ on PATH to run)
+      "neocmake",     -- CMake (neocmakelsp; Rust binary — cmake-language-server
+                      -- needs Python <3.14 which isn't satisfiable here)
+      "protols",      -- Protocol Buffers (built with cargo)
+      "texlab",       -- LaTeX
+
+      -- Infra / DevOps
+      "dockerls",                        -- Dockerfile
+      "docker_compose_language_service", -- Docker Compose
+      "helm_ls",                         -- Helm charts
+      "terraformls",                     -- Terraform
+      "azure_pipelines_ls",              -- Azure Pipelines
+      "gh_actions_ls",                   -- GitHub Actions workflows
+
+      -- Data / config
+      "jsonls",       -- JSON
+      "yamlls",       -- YAML
+      -- "jqls",      -- jq LSP needs Go on PATH. Re-add after `mise use -g go`.
+                      -- Meanwhile jq gets tree-sitter highlighting + `jq` formatter.
+      "prismals",     -- Prisma
+      "dotls",        -- Graphviz DOT language server
+      "marksman",     -- Markdown
     },
 
     -- Automatically enable servers via Neovim 0.11/0.12+ native vim.lsp.enable()
