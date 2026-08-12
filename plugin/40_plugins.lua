@@ -117,6 +117,10 @@ now_if_args(function()
     'jsx',
     'latex',
   }
+
+  -- Treat '*.conf' as ini-style ('dosini' has built-in regex syntax; extended
+  -- for space-separated `Key value` pairs in 'after/syntax/dosini.vim')
+  vim.filetype.add({ extension = { conf = 'dosini' } })
   local isnt_installed = function(lang)
     return #vim.api.nvim_get_runtime_file('parser/' .. lang .. '.*', false) == 0
   end
@@ -257,4 +261,8 @@ Config.now(function()
   require('gruvbox').setup({ transparent_mode = true })
   -- Enable only one
   vim.cmd('color gruvbox')
+end)
+
+Config.now(function()
+  add({'https://github.com/evilcel3ri/nvim-splunk-linter'})
 end)

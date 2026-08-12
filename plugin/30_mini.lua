@@ -102,6 +102,32 @@ now(function() require('mini.notify').setup({ lsp_progress = { enable = false } 
 -- - `<Leader>sd` - delete previously started session
 now(function() require('mini.sessions').setup() end)
 
+-- milli's splash animation redraws every frame, which resets the terminal
+-- cursor blink timer and shows as rapid flicker. Kill blink just while the
+-- starter buffer is open.
+do
+  local group = vim.api.nvim_create_augroup('MiniStarterNoBlink', {})
+  local prev_guicursor
+  vim.api.nvim_create_autocmd('FileType', {
+    group = group,
+    pattern = 'ministarter',
+    callback = function()
+      prev_guicursor = vim.o.guicursor
+      vim.o.guicursor = 'a:ver1-blinkon0'
+    end,
+  })
+  vim.api.nvim_create_autocmd('BufLeave', {
+    group = group,
+    pattern = '*',
+    callback = function(args)
+      if prev_guicursor and vim.bo[args.buf].filetype == 'ministarter' then
+        vim.o.guicursor = prev_guicursor
+        prev_guicursor = nil
+      end
+    end,
+  })
+end
+
 -- Start screen. This is what is shown when you open Neovim like `nvim`.
 -- Example usage:
 -- - Type prefix keys to limit available candidates

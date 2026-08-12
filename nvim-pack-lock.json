@@ -32,6 +32,10 @@
       "rev": "bfcc0171a43f22afa61d927ffe9fcb6cb85dc99e",
       "src": "https://github.com/neovim/nvim-lspconfig"
     },
+    "nvim-splunk-linter": {
+      "rev": "44ae63a9f7e0f25f4707751e78d5a16355487a30",
+      "src": "https://github.com/evilcel3ri/nvim-splunk-linter"
+    },
     "nvim-tmux-navigation": {
       "rev": "4898c98702954439233fdaf764c39636681e2861",
       "src": "https://github.com/alexghergh/nvim-tmux-navigation"
