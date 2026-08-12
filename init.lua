@@ -65,6 +65,24 @@
 -- It is a global variable which can be use both as `_G.Config` and `Config`
 _G.Config = {}
 
+-- Make version-manager (mise) and cargo binaries visible to Neovim even when it
+-- is launched outside an interactive shell (e.g. from a GUI/app launcher). mise
+-- only puts node/npm/go on PATH via a shell hook, so without this Mason can't
+-- find `npm`/`go`/`cargo` to build language servers, formatters, and linters.
+-- The mise `shims/` directory is a static PATH that works without the hook.
+do
+  local extra = {
+    vim.fn.expand('~/.local/share/mise/shims'),
+    vim.fn.expand('~/.cargo/bin'),
+    vim.fn.expand('~/.local/bin'),
+  }
+  for _, dir in ipairs(extra) do
+    if vim.fn.isdirectory(dir) == 1 and not string.find(vim.env.PATH, dir, 1, true) then
+      vim.env.PATH = dir .. ':' .. vim.env.PATH
+    end
+  end
+end
+
 -- Define custom autocommand group and helper to create an autocommand.
 -- Autocommands are Neovim's way to define actions that are executed on events
 -- (like creating a buffer, setting an option, etc.).
